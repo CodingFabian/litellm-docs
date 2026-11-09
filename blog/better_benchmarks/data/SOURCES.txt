@@ -24,4 +24,6 @@ cores and 16 GiB. Single run of each configuration.
 Render the charts with matplotlib 3.10.8:
   MPLCONFIGDIR=/tmp/matplotlib python3 scripts/render-better-benchmarks.py
 The article uses the generated SVGs; PNG copies are also generated for sharing.
-Latency axes in headline and sweep charts are logarithmic, with no capped bars.
+Headline chart: four linear bar panels; Python latency is listed separately.
+OpenRouter is excluded from this chart because it uses a separate test.
+Latency axes in the sweep chart are logarithmic, with no capped bars.

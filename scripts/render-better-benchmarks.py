@@ -39,44 +39,56 @@ def clean(ax, axis='y'):
 def save(fig, name, note):
     fig.text(.055, .035, note, fontsize=9, color=MUTED, va='bottom', linespacing=1.6)
     for ext in ('png', 'svg'):
-        fig.savefig(ROOT / 'img' / f'{name}.{ext}', dpi=180)
+        output = ROOT / 'img' / f'{name}.{ext}'
+        fig.savefig(output, dpi=180)
+        if ext == 'svg':
+            output.write_text('\n'.join(line.rstrip() for line in output.read_text().splitlines()) + '\n')
     plt.close(fig)
 
 def headline():
-    rows = data('headline')
-    fig = frame('Gateway performance at 50 requests / sec', 'Five-minute run · lower is better · exact values beside every mark', 10)
-    metrics = [('gateway_overhead_p50_ms', 'Median overhead', 'ms', True),
-               ('gateway_overhead_p99_ms', 'Tail overhead · p99', 'ms', True),
-               ('cpu_cores_mean', 'CPU', 'cores', False),
-               ('peak_memory_mib', 'Peak memory', 'MiB', False)]
-    for i, (key, title, unit, log) in enumerate(metrics):
-        ax = fig.add_axes([.065 + (i % 2)*.49, .56 - (i//2)*.36, .385, .25])
-        for j,r in enumerate(rows):
-            y = 4-j
-            name = r['gateway'].replace('LiteLLM ', '') + ('*' if r['gateway']=='OpenRouter' else '')
-            col = BLUE if j==0 else '#aeb8ca'
-            ax.text(.0, y+.28, name, transform=ax.get_yaxis_transform(), fontsize=10, weight='bold' if j==0 else 'normal', color=INK)
-            if r[key]:
-                value=float(r[key])
-                if log:
-                    ax.scatter(value,y,s=48,color=col,zorder=3)
-                else:
-                    ax.barh(y,value,height=.23,color=col,zorder=3)
-                label=f'{value:g} {unit}'
-                ax.annotate(label,(value,y),xytext=(7,0),textcoords='offset points',va='center',fontsize=10,color=BLUE if j==0 else INK,weight='bold' if j==0 else 'normal')
-            else:
-                ax.text(0,y,'Not available (hosted)',transform=ax.get_yaxis_transform(),fontsize=9,color=MUTED,va='center')
-        ax.set_title(title + (' · log scale' if log else ''),loc='left',fontsize=13,weight='bold',pad=27)
-        ax.set_ylim(-.6,4.7);ax.set_yticks([])
-        if log:
-            ax.set_xscale('log');ax.set_xlim(.3,10000 if i==1 else 500)
-            ax.set_xticks([1,10,100,1000] if i==1 else [1,10,100]);ax.xaxis.set_major_formatter(FuncFormatter(lambda v,p:f'{v:g}'))
-            ax.xaxis.set_minor_locator(NullLocator())
-        else:
-            ax.set_xlim(0,4 if i==2 else 13000)
-            ax.set_xticks([0,1,2,3] if i==2 else [0,4000,8000])
-        clean(ax,'x')
-    save(fig,'headline','Full features; Portkey has none. All gateways served 100% of requests. 4 cores / 16 GiB per pod.\n*OpenRouter: separate Azure test at 8 RPS. Its p99 is not baseline-subtracted; see methodology.\nLatency uses a logarithmic axis so every value remains visible without capped bars.')
+    rows = {row['gateway']: row for row in data('headline')}
+    fig = frame('Same load. Less overhead.',
+                '50 requests / sec · full features · lower is better', 8.8)
+    order = ['LiteLLM Rust', 'Bifrost', 'Portkey', 'LiteLLM Python']
+    metrics = [
+        ('gateway_overhead_p50_ms', 'Median overhead', 'ms', 3.4, [0, 1, 2, 3]),
+        ('gateway_overhead_p99_ms', 'p99 overhead', 'ms', 8, [0, 2, 4, 6]),
+        ('cpu_cores_mean', 'CPU used', 'cores', 4, [0, 1, 2, 3]),
+        ('peak_memory_mib', 'Peak memory', 'MiB', 13500, [0, 4000, 8000]),
+    ]
+    for i, (key, title, unit, limit, ticks) in enumerate(metrics):
+        ax = fig.add_axes([.07 + (i % 2) * .49,
+                           .53 if i < 2 else .18, .34, .23])
+        gateways = order[:3] if i < 2 else order
+        for j, gateway in enumerate(gateways):
+            value = float(rows[gateway][key])
+            y = len(gateways) - 1 - j
+            highlight = gateway == 'LiteLLM Rust'
+            color = BLUE if highlight else '#aeb8ca'
+            ax.barh(y, value, height=.25, color=color, zorder=3)
+            ax.text(0, y + .25, gateway.replace('LiteLLM ', ''),
+                    fontsize=11, color=INK,
+                    weight='bold' if highlight else 'normal')
+            ax.annotate(f'{value:g} {unit}', (value, y), xytext=(7, 0),
+                        textcoords='offset points', va='center', fontsize=11,
+                        color=BLUE if highlight else INK,
+                        weight='bold' if highlight else 'normal')
+        ax.set_title(title, loc='left', fontsize=15, weight='bold', pad=23)
+        ax.set_xlim(0, limit)
+        ax.set_ylim(-.5, len(gateways) - .3)
+        ax.set_xticks(ticks)
+        ax.set_yticks([])
+        ax.tick_params(axis='x', labelsize=10)
+        clean(ax, 'x')
+        if i < 2:
+            python_value = float(rows['LiteLLM Python'][key])
+            fig.text(.07 + i * .49, .485,
+                     f'Python: {python_value:,.1f} ms (outside this panel)',
+                     fontsize=10, color=MUTED)
+    save(fig, 'headline',
+         '5 minutes · 4 cores / 16 GiB per gateway · single run · 100% of requests served.\n'
+         'Full features; Portkey has none. Latency subtracts a separate direct-to-mock run.\n'
+         'Bars start at zero. Python latency is listed separately; OpenRouter uses a separate test.')
 
 def lines(name, title, subtitle, fields, xkey, note):
     rows=data('sweep' if name == 'sweep-linear' else name);fig=frame(title,subtitle,10)

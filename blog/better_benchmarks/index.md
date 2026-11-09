@@ -14,7 +14,7 @@ hide_table_of_contents: false
 
 We mentioned last week that we would be posting updated, more representative benchmarks with common features enabled. The headline numbers are in, and they're great!
 
-![Latency p50 and p99 on logarithmic axes, CPU and memory at 50 rps](./img/headline.svg)
+![Four linear bar comparisons of median overhead, p99 overhead, CPU and peak memory at 50 rps; Python latency listed separately](./img/headline.svg)
 
 {/* truncate */}
 
